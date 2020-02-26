@@ -6,19 +6,16 @@
     
 #define MAXVAL 100
 #define NUMBER '0'
-#define NAME 'n'
-#define VAR 26
-#define MAXOP 100// max value for operand/operator
-
-int getch_(void);
-void ungetch_(int);
-int getop(char []);
-void push(double);
-double pop(void);
+#define MATH '1'
+#define STACK '2'
+#define VARIABLE '3'
+#define CONSTANT '4'
+#define MAXOP 100 // max value for operand/operator
 
 size_t sp = 0;
 double val[MAXVAL];
 
+char variables[BUFSIZ];
 char buf[BUFSIZ];
 size_t bufp = 0;
 
@@ -33,23 +30,24 @@ void ungetch_(int c) {
         buf[bufp++] = c;
 }
 
+void build_string(char s[]) {
+    int c, i = 0;
+    while(isalpha(s[i++] = c = getch_())) { }
+    s[i] = '\0';
+}
+
 int getop(char s[]) {
     int i, c;
     
     while((s[0] = c = getch_()) == ' ' || c == '\t') { }
     s[1] = '\0';
-    if(islower(c)) {
-        while(islower(s[++i] = c = getch_())) { }
-        s[i]='\0';
-        if(c != EOF)
-            ungetch_(c);
-        if(strlen(s)>1)
-            return NAME;
-        else
-            return c;
-    }
-    if(!isdigit(c) && c != '.')
-        return c; //if not a digit, return
+    
+    if(c == '@')                { build_string(s); return STACK; }
+    if(c == '=' || c == '?')    { build_string(s); return VARIABLE; }
+    if(isalpha(c))              { build_string(s); return MATH; }
+    if(c == '_')                { build_string(s); return CONSTANT; }
+    if(!isdigit(c) && c != '.') { return c; }
+
     i = 0;
     if(isdigit(c))
         while(isdigit(s[++i] = c = getch_())) { }
@@ -77,7 +75,7 @@ double pop(void) {
     }
 }
 
-double head(void) { // getting head without popping it
+double peek(void) { // getting head without popping it
     if (sp > 0)
           return val[sp - 1];
       else {
@@ -87,7 +85,7 @@ double head(void) { // getting head without popping it
 }
 
 void duplicate(void) {
-    push(head());
+    push(peek());
 }
 
 void swap(void) {
@@ -110,38 +108,71 @@ void clear(void) {
     sp = 0;
 }
 
-void mathfunc(char s[]) {
-    double op2;
-    
-    if(strcmp(s,"sin") == 0)
-        push(sin(pop()));
-    else if(strcmp(s,"cos") == 0)
-        push(cos(pop()));
-    else if(strcmp(s,"exp") == 0)
-        push(exp(pop()));
-    else if(strcmp(s,"pow") == 0)
-    {
-        op2 = pop();
-        push(pow(pop(),op2));
+void stack(char s[]) {
+    ++s;
+    if(strcmp(s, "duplicate") == 0) {
+      duplicate();
+    } else if(strcmp(s, "peak") == 0) {
+      peek();  
+    } else if(strcmp(s, "swap") == 0) {
+      swap();
+    } else if(strcmp(s, "clear") == 0) {
+      clear();  
+    } else {
+      printf("Unknown stack operation\n");
     }
-    else
-        printf("error: %s is not supported\n",s);
+}
+
+void mathfunc(char s[]) {
+    double op1, op2, result = 0;
+    
+    if(strcmp(s,"pow") == 0) {
+      op2 = pop();
+      op1 = pop();
+      result = pow(op1, op2);
+    } else if(strcmp(s,"sin") == 0) { result = sin(pop()); 
+    } else if(strcmp(s,"cos") == 0) { result = cos(pop());
+    } else if(strcmp(s,"exp") == 0) { result = exp(pop());
+    } else if(strcmp(s,"tan") == 0) { result = tan(pop());
+    } else if(strcmp(s,"sqrt") == 0) { result = sqrt(pop());
+    } else { printf("error: %s is not supported\n",s); }
+
+    push(result);
+    printf("%.3f\n", result);
+}
+
+void variable(char s[]) {
+    if(*s == '=') { variables[*++s - 'A'] = pop(); } 
+    else if(*s == '?') { push(variables[*++s - 'A']); }
+}
+            
+void constant(char s[]) {
+    ++s;
+    if(strcmp(s, "PI") == 0) { push(3.141592); }
+    else if(strcmp(s, "e") == 0) { push(2.71828); }
 }
 
 void rpnc(void) {
     int type;
-    int var = 0;
-    double op2, v;
+    double op2;
     char s[BUFSIZ];
-    double variable[VAR];
     
     while((type = getop(s)) != EOF) {
         switch(type) {
             case NUMBER:
                 push(atof(s));
                 break;
-            case NAME:
+            case MATH:
                 mathfunc(s);
+                break;
+            case STACK:
+                stack(s);
+                break;
+            case VARIABLE:
+                variable(s);
+                break;
+            case CONSTANT:
+                constant(s);
                 break;
             case '+':
                 push(pop() + pop());
@@ -167,37 +198,13 @@ void rpnc(void) {
                 else
                     printf("error: zero divisor\n");
                 break;
-            case '=':
-                pop();
-                if(var>='A' && var <='Z')
-                    variable[var-'A']=pop();
-                else
-                    printf("error: novariablename\n");
-                break;
-            case '?':
-                printf("Top of stack: %f\n", head());
-                break;
-            case 'd':
-                printf("Duplcate top of stack\n");
-                duplicate();
-                break;
-            case 's':
-                printf("Swap top two elements of stack\n");
-                swap();
-                break;
-            case 'c':
-                printf("Clear stack\n");
-                clear();
-                break;
             case '\n':
-                v = pop();
                 printf("\t%.8g\n", pop());
                 break;
             default:
                 printf("error: unknown command %s\n", s);
                 break;
         }
-        var = type;
     }
 }
 
